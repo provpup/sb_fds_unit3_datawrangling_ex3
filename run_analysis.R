@@ -5,6 +5,21 @@ library(dplyr)
 library(tidyr)
 library(readr)
 
+compute_average_summary_by_activity <- function (data) {
+  summary <- data %>%
+    group_by(ActivityLabel) %>%
+    summarise_all(mean)
+  return(summary)
+}
+
+compute_average_summary_by_subject <- function (data) {
+  summary <- data %>%
+    group_by(Subject) %>%
+    mutate(activity_code = NA) %>%
+    summarise_all(mean)
+  return(summary)
+}
+
 # Clean data function for a particular data set
 clean_data <- function (dataset_name, columns, activity_codes, directory_root) {
   # Read the measurement data using the column names computed from the features file
@@ -28,11 +43,17 @@ clean_data <- function (dataset_name, columns, activity_codes, directory_root) {
   # Combine the measurement data with the activity + subject data
   data <- data %>%
     tbl_df() %>%
-    bind_cols(training_activity) %>%
+    bind_cols(training_activity)
+  
+  # Compute the average values by subject and average values by activity
+  # and then combine them into one data set
+  data <- bind_rows(compute_average_summary_by_activity(data),
+                    compute_average_summary_by_subject(data)) %>%
     mutate(dataset = dataset_name)
   
   return(data)
 }
+
 
 directory <- './UCI HAR Dataset/'
 all_activity_codes <- scan(paste(directory, 'activity_labels.txt', sep = ""),
@@ -42,12 +63,9 @@ all_activity_codes <- tbl_df(all_activity_codes)
 # Create unique column names from the features data
 features <- scan(paste(directory, 'features.txt', sep = ""), what = list(number = 0, name = character()))
 measurement_columns <- make.names(features$name, unique = TRUE)
+
 training_data <- clean_data('train', measurement_columns, all_activity_codes, directory)
 test_data <- clean_data('test', measurement_columns, all_activity_codes, directory)
 
-# Combine the training data and the test data
-
-View(training_data)
-
-# TODO: Combine data frames into one
-# TODO: Write data frame to file
+write_csv(training_data, './training_data_mean.csv')
+write_csv(test_data, './test_data_mean.csv')
